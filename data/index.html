@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+  <meta charset='utf-8'>
+  <meta name="viewport" content="width=700, initial-scale=1.0, minimum-scale=1.0">
+  <title>e-paper name tag #badgelife</title>
+  <link rel='stylesheet' href='waveshare-demo-styles.css'>
+  <script src='waveshare-demo-processingA.js'></script>
+  <script src='waveshare-demo-processingB.js'></script>
+  <script src='waveshare-demo-processingC.js'></script>
+  <script src='waveshare-demo-processingD.js'></script>
+  <script src='zipso-sketchpad-lines.js'></script>
+  <link rel='stylesheet' href='zipso-sketchpad-lines.css'>
+  <style>
+    img { display: none; }
+    #logTag { clear: both; padding-top: 1em;}
+  </style>
+</head>
+<body>
+
+<img id="badgeimg1" src="metaaskmewide.png">
+<img id="badgeimg2" src="metatheythem.png">
+<img id="badgeimg3" src="metasheherwide.png">
+<img id="badgeimg4" src="metahehimwide.png">
+
+<div id="sketchpadapp">
+  <div class="leftside">
+    Choose a pronoun pin:<br>
+    <input type="button" class="pronounpin" onclick="return EPAPERNAMETAG.setBadge(1);" value="Ask me"><br>
+    <input type="button" class="pronounpin" onclick="return EPAPERNAMETAG.setBadge(2);" value="They/them"><br>
+    <input type="button" class="pronounpin" onclick="return EPAPERNAMETAG.setBadge(3);" value="She/her"><br>
+    <input type="button" class="pronounpin" onclick="return EPAPERNAMETAG.setBadge(4);" value="He/him"><br>
+    <br>
+    Draw your name!  If you need to start over: 
+    <input type="button" onclick="return EPAPERNAMETAG.clearBadge();" value="Erase name tag"><br>
+    <br>
+    Before you upload, does the cable come out the top of your e-paper panel?  If so: 
+    <input type="button" onclick="return EPAPERNAMETAG.rotateBadge();" value="Rotate 180°"><br>
+    <br>
+    <input type="button" onclick="return EPAPERNAMETAG.uploadBadge();" value="Upload name tag">
+  </div>
+  <div class="rightside">
+    <canvas id="sketchpad" height="300" width="400"></canvas>
+  </div>
+</div>
+
+<div id='logTag'>(Not uploading yet)</div>
+
+<script>
+  var EPAPERNAMETAG = EPAPERNAMETAG || {};
+  
+  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+  EPAPERNAMETAG.getRandomInt = function(min, max) {
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
+  }
+  
+  EPAPERNAMETAG.clearBadge = function() {
+    EPAPERNAMETAG.sketchpadContext.drawImage(EPAPERNAMETAG.currentBadgeElement, 0, 0, 400, 300);
+  }
+  
+  EPAPERNAMETAG.setBadge = function(badge) {
+    EPAPERNAMETAG.currentBadgeNumber = badge;
+    EPAPERNAMETAG.currentBadgeElement = document.getElementById('badgeimg' + EPAPERNAMETAG.currentBadgeNumber);
+    EPAPERNAMETAG.clearBadge();
+  }
+  
+  // https://stackoverflow.com/a/12772651
+  EPAPERNAMETAG.rotateBadge = function(){
+    var rotationElement = document.createElement('canvas');
+    var rotationContext = rotationElement.getContext('2d');
+    
+    rotationElement.width = 400;
+    rotationElement.height = 300;
+    rotationContext.msImageSmoothingEnabled = false;
+    rotationContext.imageSmoothingEnabled = false;
+    
+    rotationContext.save();
+    /// shift our "hotspot" to the center
+    rotationContext.translate(200, 150);
+    /// rotate 45 degrees clockwise.. obviously you can do what you want here
+    /// scale, fade, flip, stretch, rotate... whatever 
+    rotationContext.rotate(Math.PI);
+    /// draw your first canvas with it's manipulated image on to the second
+    /// along with it's rotation
+    rotationContext.drawImage(EPAPERNAMETAG.sketchpadElement, -200, -150);
+    /// all done
+    rotationContext.restore();
+    
+    var rotatedData = rotationContext.getImageData(0, 0, 400, 300);
+    EPAPERNAMETAG.sketchpadContext.putImageData(rotatedData, 0, 0);
+  }
+  
+  // https://j11y.io/snippets/shuffling-the-dom/
+  EPAPERNAMETAG.shuffleButtons = function(elems) {
+    allElems = (function(){
+      var ret = [], l = elems.length;
+      while (l--) { ret[ret.length] = elems[l]; }
+        return ret;
+    })();
+    
+    var shuffled = (function(){
+      var l = allElems.length, ret = [];
+      while (l--) {
+        var random = Math.floor(Math.random() * allElems.length), randEl = allElems[random].cloneNode(true);
+        allElems.splice(random, 1);
+        ret[ret.length] = randEl;
+      }
+      return ret; 
+    })(), l = elems.length;
+    
+    while (l--) {
+      elems[l].parentNode.insertBefore(shuffled[l], elems[l].nextSibling);
+      elems[l].parentNode.removeChild(elems[l]);
+    }
+  }
+  
+  EPAPERNAMETAG.uploadBadge = function() {
+    procImg(true, true);
+    uploadImage();
+  }
+  
+  // https://stackoverflow.com/a/45749684
+  EPAPERNAMETAG.createBrush = function(radius, color) {
+    var ctx = document.createElement("canvas").getContext("2d");
+    ctx.canvas.width = ctx.canvas.height = 1 + radius<<1; 
+    ctx.fillStyle = color;            
+    EPAPERNAMETAG.aliasedCircle(ctx, radius, radius, radius);
+    ctx.fill();                  
+    return ctx.canvas
+  }
+
+  EPAPERNAMETAG.aliasedCircle = function(ctx, xc, yc, r) {   // NOTE: for fill only!
+    var x = r, y = 0, cd = 0;
+
+    // middle line
+    ctx.rect(xc - x, yc, r<<1, 1);
+
+    while (x > y) {
+      cd -= (--x) - (++y);
+      if (cd < 0) cd += x++;
+      ctx.rect(xc - y, yc - x, y<<1, 1);  // upper 1/4
+      ctx.rect(xc - x, yc - y, x<<1, 1);  // upper 2/4
+      ctx.rect(xc - x, yc + y, x<<1, 1);  // lower 3/4
+      ctx.rect(xc - y, yc + x, y<<1, 1);  // lower 4/4
+    }
+  }
+
+  EPAPERNAMETAG.fastLine = function(ctx, x1, y1, x2, y2) {
+    var dlt, mul,
+        sl = y2 - y1,
+        ll = x2 - x1,
+        yl = false,
+        lls = ll >> 31,
+        sls = sl >> 31,
+        i;
+
+    if ((sl ^ sls) - sls > (ll ^ lls) - lls) {
+      sl ^= ll;
+      ll ^= sl;
+      sl ^= ll;
+      yl = true
+    }
+
+    dlt = ll < 0 ? -1 : 1;
+    mul = (ll === 0) ? sl : sl / ll;
+
+    if (yl) {
+      x1 += 0.5;
+      for (i = 0; i !== ll; i += dlt)
+        //ctx.rect((x1 + i * mul)|0, y1 + i, 1, 1)
+        ctx.drawImage(EPAPERNAMETAG.brush, (x1 + i * mul)|0, y1 + i)
+    }
+    else {
+      y1 += 0.5;
+      for (i = 0; i !== ll; i += dlt)
+        //ctx.rect(x1 + i, (y1 + i * mul)|0, 1, 1)
+        ctx.drawImage(EPAPERNAMETAG.brush, x1 + i, (y1 + i * mul)|0)
+    }
+  }
+  
+  window.onload = function() {
+    sketchpadInit();
+  
+    EPAPERNAMETAG.brush = EPAPERNAMETAG.createBrush(6, "#000");
+    EPAPERNAMETAG.sketchpadElement = document.getElementById('sketchpad');
+    EPAPERNAMETAG.sketchpadContext = EPAPERNAMETAG.sketchpadElement.getContext('2d');
+    EPAPERNAMETAG.sketchpadContext.msImageSmoothingEnabled = false;
+    EPAPERNAMETAG.sketchpadContext.imageSmoothingEnabled = false;
+    EPAPERNAMETAG.shuffleButtons(document.getElementsByClassName('pronounpin'));
+    EPAPERNAMETAG.setBadge(EPAPERNAMETAG.getRandomInt(1, 5));
+  }
+</script>
+</body>
+</html>
